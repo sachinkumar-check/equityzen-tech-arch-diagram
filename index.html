@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EquityZen Technology Architecture Diagram</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .diagram-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            padding: 20px;
+            margin-bottom: 30px;
+            overflow-x: auto;
+            min-height: 800px;
+        }
+
+        #architecture {
+            width: 100%;
+            height: 800px;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .btn-reset {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-reset:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-zoom {
+            background: #764ba2;
+            color: white;
+        }
+
+        .btn-zoom:hover {
+            background: #64408b;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(118, 75, 162, 0.4);
+        }
+
+        .legend {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .legend h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .legend-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .legend-box {
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+            flex-shrink: 0;
+        }
+
+        .legend-text {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .node {
+            cursor: pointer;
+            stroke: #fff;
+            stroke-width: 2px;
+        }
+
+        .node:hover {
+            filter: drop-shadow(0 0 10px rgba(0,0,0,0.3));
+        }
+
+        .node text {
+            pointer-events: none;
+            font-weight: 500;
+            font-size: 12px;
+        }
+
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+
+        .link.external {
+            stroke: #ff6b6b;
+            stroke-dasharray: 5,5;
+        }
+
+        .link.internal {
+            stroke: #4ecdc4;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            pointer-events: none;
+            max-width: 300px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .info-panel {
+            position: fixed;
+            right: -400px;
+            top: 0;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.2);
+            overflow-y: auto;
+            transition: right 0.3s ease;
+            z-index: 999;
+            padding: 20px;
+        }
+
+        .info-panel.show {
+            right: 0;
+        }
+
+        .info-panel h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .info-panel p {
+            margin-bottom: 8px;
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
+        .close-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+            font-size: 1.5em;
+            color: #999;
+        }
+
+        .close-panel:hover {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏗️ EquityZen Technology Architecture</h1>
+            <p>Interactive Layer Diagram - External Vendors & Internal Connections</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn-reset" onclick="resetZoom()">Reset View</button>
+            <button class="btn-zoom" onclick="zoomIn()">Zoom In</button>
+            <button class="btn-zoom" onclick="zoomOut()">Zoom Out</button>
+        </div>
+
+        <div class="diagram-container">
+            <svg id="architecture"></svg>
+        </div>
+
+        <div class="legend">
+            <h3>Legend & Components</h3>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                    <div class="legend-text"><strong>Frontend/Development</strong> - UI & Code Quality</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-box" style="background: linear-gradient(135deg, #226caa 0%, #1f5a9d 100%);"></div>
+                    <div class="legend-text"><strong>API & Backend</strong> - GraphQL/REST Services</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-box" style="background: linear-gradient(135deg, #092e20 0%, #0d3b26 100%);"></div>
+                    <div class="legend-text"><strong>Data Layer</strong> - ORM & Query Processing</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-box" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a29c 100%);"></div>
+                    <div class="legend-text"><strong>Database & Search</strong> - Storage & Indexing</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-box" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);"></div>
+                    <div class="legend-text"><strong>External Vendors</strong> - Third-party Services</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-box" style="background: linear-gradient(135deg, #f9ca24 0%, #f0932b 100%);"></div>
+                    <div class="legend-text"><strong>Internal Dependencies</strong> - Custom Forks</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+    <div class="info-panel" id="infoPanel">
+        <span class="close-panel" onclick="closePanel()">✕</span>
+        <div id="panelContent"></div>
+    </div>
+
+    <script>
+        const componentInfo = {
+            'eslint': {
+                name: 'ESLint Plugin',
+                description: 'EquityZen custom ESLint plugins for code quality and standards enforcement.',
+                repo: 'eslint-plugin-equityzen',
+                language: 'JavaScript',
+                dependencies: []
+            },
+            'graphql': {
+                name: 'GraphQL API',
+                description: 'GraphQL API layer for flexible query handling and real-time data operations.',
+                repo: 'Custom Implementation',
+                language: 'Python',
+                dependencies: ['Graphene']
+            },
+            'graphene': {
+                name: 'Graphene',
+                description: 'Custom fork of Graphene - Python GraphQL framework for building GraphQL APIs.',
+                repo: 'graphene',
+                language: 'Python',
+                dependencies: ['graphql-core']
+            },
+            'graphene-django': {
+                name: 'Graphene-Django',
+                description: 'Integration layer between Graphene and Django, enabling Django models as GraphQL types.',
+                repo: 'graphene-django',
+                language: 'Python',
+                dependencies: ['Django', 'Graphene', 'djangorestframework']
+            },
+            'django-admin': {
+                name: 'Django Admin + Grappelli',
+                description: 'Admin interface with Grappelli skin for database management and CRUD operations.',
+                repo: 'django-grappelli',
+                language: 'Python',
+                dependencies: ['Django']
+            },
+            'django-orm': {
+                name: 'Django ORM',
+                description: 'Object-Relational Mapping layer for database operations and model definitions.',
+                repo: 'Django Core',
+                language: 'Python',
+                dependencies: []
+            },
+            'computed-fields': {
+                name: 'Computed Fields',
+                description: 'Auto-generated and auto-updated database fields for model methods.',
+                repo: 'django-computedfields',
+                language: 'Python',
+                dependencies: ['Django', 'django-fast-update']
+            },
+            'rest-models': {
+                name: 'REST Models',
+                description: 'Django database driver that queries REST APIs instead of relational databases.',
+                repo: 'django-rest-models',
+                language: 'Python',
+                dependencies: ['Django', 'requests']
+            },
+            'relational-db': {
+                name: 'Relational Database',
+                description: 'Primary data store (PostgreSQL/MySQL) for persistent data storage.',
+                repo: 'External Service',
+                language: 'SQL',
+                dependencies: []
+            },
+            'elasticsearch': {
+                name: 'Elasticsearch',
+                description: 'Distributed search and analytics engine for advanced search and indexing.',
+                repo: 'External Service',
+                language: 'Java/REST API',
+                dependencies: []
+            },
+            'es-dsl': {
+                name: 'Elasticsearch DSL Python',
+                description: 'High-level Python client for Elasticsearch with query DSL support.',
+                repo: 'elasticsearch-dsl-py',
+                language: 'Python',
+                dependencies: ['elasticsearch', 'python-dateutil']
+            },
+            'blockscore': {
+                name: 'BlockScore API',
+                description: 'Identity verification and compliance service for user verification.',
+                repo: 'blockscore-python',
+                language: 'Python Wrapper',
+                dependencies: ['requests']
+            }
+        };
+
+        const architectureData = {
+            nodes: [
+                // Frontend/Development Layer
+                { id: 'eslint', label: 'ESLint Plugin', layer: 'frontend', type: 'internal' },
+                
+                // API & Backend Layer
+                { id: 'graphql', label: 'GraphQL API', layer: 'api', type: 'internal' },
+                { id: 'graphene', label: 'Graphene\n(GraphQL Framework)', layer: 'api', type: 'internal' },
+                { id: 'graphene-django', label: 'Graphene-Django\n(Integration)', layer: 'api', type: 'internal' },
+                { id: 'django-admin', label: 'Django Admin\n+ Grappelli', layer: 'api', type: 'internal' },
+                
+                // Data Access Layer
+                { id: 'django-orm', label: 'Django ORM', layer: 'data', type: 'internal' },
+                { id: 'computed-fields', label: 'Computed Fields\n(Auto-update)', layer: 'data', type: 'internal' },
+                { id: 'rest-models', label: 'REST Models\n(Query Layer)', layer: 'data', type: 'internal' },
+                
+                // Database & Search Layer
+                { id: 'relational-db', label: 'Relational DB\n(PostgreSQL/MySQL)', layer: 'database', type: 'external' },
+                { id: 'elasticsearch', label: 'Elasticsearch', layer: 'database', type: 'external' },
+                { id: 'es-dsl', label: 'ES DSL Python\nClient', layer: 'database', type: 'internal' },
+                
+                // External Services
+                { id: 'blockscore', label: 'BlockScore\n(Identity Verification)', layer: 'vendor', type: 'external' }
+            ],
+            
+            links: [
+                // Frontend to API
+                { source: 'eslint', target: 'graphene', type: 'internal', label: 'Lints' },
+                
+                // GraphQL connections
+                { source: 'graphql', target: 'graphene', type: 'internal', label: 'Uses' },
+                { source: 'graphene', target: 'graphene-django', type: 'internal', label: 'Integrates' },
+                { source: 'graphene-django', target: 'django-orm', type: 'internal', label: 'Uses' },
+                
+                // Admin connections
+                { source: 'django-admin', target: 'django-orm', type: 'internal', label: 'Manages' },
+                
+                // Data Layer connections
+                { source: 'django-orm', target: 'computed-fields', type: 'internal', label: 'Enhanced by' },
+                { source: 'django-orm', target: 'rest-models', type: 'internal', label: 'Falls back to' },
+                
+                // GraphQL to data
+                { source: 'graphql', target: 'django-orm', type: 'internal', label: 'Fetches data' },
+                
+                // Database connections
+                { source: 'django-orm', target: 'relational-db', type: 'internal', label: 'Read/Write' },
+                { source: 'computed-fields', target: 'relational-db', type: 'internal', label: 'Updates' },
+                
+                // Elasticsearch connections
+                { source: 'django-orm', target: 'elasticsearch', type: 'internal', label: 'Syncs data' },
+                { source: 'es-dsl', target: 'elasticsearch', type: 'internal', label: 'Queries' },
+                { source: 'graphql', target: 'es-dsl', type: 'internal', label: 'Uses' },
+                
+                // External vendor connections
+                { source: 'rest-models', target: 'blockscore', type: 'external', label: 'REST API Call' },
+                { source: 'django-orm', target: 'blockscore', type: 'external', label: 'Verification' }
+            ]
+        };
+
+        // Layer positions
+        const layerY = {
+            frontend: 100,
+            api: 250,
+            data: 450,
+            database: 650,
+            vendor: 750
+        };
+
+        // Create SVG
+        const svg = d3.select('#architecture');
+        const width = document.getElementById('architecture').parentElement.clientWidth;
+        const height = 800;
+
+        // Add zoom behavior
+        const g = svg.append('g');
+        const zoom = d3.zoom().on('zoom', (event) => {
+            g.attr('transform', event.transform);
+        });
+        svg.call(zoom);
+
+        // Create force simulation
+        const simulation = d3.forceSimulation(architectureData.nodes)
+            .force('link', d3.forceLink(architectureData.links).id(d => d.id).distance(100))
+            .force('charge', d3.forceManyBody().strength(-400))
+            .force('y', d3.forceY().y(d => layerY[d.layer]))
+            .force('x', d3.forceX().x(width / 2).strength(0.1));
+
+        // Create arrowheads
+        svg.append('defs').selectAll('marker')
+            .data(['internal', 'external'])
+            .join('marker')
+            .attr('id', d => `arrow-${d}`)
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 30)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', d => d === 'internal' ? '#4ecdc4' : '#ff6b6b');
+
+        // Draw links
+        const link = g.selectAll('.link')
+            .data(architectureData.links)
+            .join('line')
+            .attr('class', d => `link ${d.type}`)
+            .attr('marker-end', d => `url(#arrow-${d.type})`)
+            .attr('stroke-width', 2);
+
+        // Draw nodes
+        const node = g.selectAll('.node')
+            .data(architectureData.nodes)
+            .join('g')
+            .attr('class', 'node')
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+
+        // Node colors based on layer and type
+        const getNodeColor = (d) => {
+            const colors = {
+                frontend: ['#667eea', '#764ba2'],
+                api: ['#226caa', '#1f5a9d'],
+                data: ['#092e20', '#0d3b26'],
+                database: ['#4ecdc4', '#44a29c'],
+                vendor: ['#ff6b6b', '#ee5a6f']
+            };
+            const layerColors = colors[d.layer] || ['#999', '#888'];
+            return d.type === 'external' ? layerColors[1] : layerColors[0];
+        };
+
+        node.append('rect')
+            .attr('width', 120)
+            .attr('height', 60)
+            .attr('x', -60)
+            .attr('y', -30)
+            .attr('rx', 5)
+            .attr('fill', getNodeColor)
+            .attr('stroke', '#fff')
+            .attr('stroke-width', 2);
+
+        node.append('text')
+            .attr('text-anchor', 'middle')
+            .attr('dy', '.35em')
+            .attr('fill', 'white')
+            .style('font-size', '11px')
+            .style('font-weight', 'bold')
+            .text(d => d.label);
+
+        // Add interactivity
+        node.on('mouseover', function(event, d) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.display = 'block';
+            tooltip.textContent = d.label;
+            tooltip.style.left = (event.pageX + 10) + 'px';
+            tooltip.style.top = (event.pageY + 10) + 'px';
+
+            d3.select(this).style('filter', 'drop-shadow(0 0 10px rgba(0,0,0,0.3))');
+        })
+        .on('mousemove', function(event) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.left = (event.pageX + 10) + 'px';
+            tooltip.style.top = (event.pageY + 10) + 'px';
+        })
+        .on('mouseout', function() {
+            document.getElementById('tooltip').style.display = 'none';
+            d3.select(this).style('filter', 'none');
+        })
+        .on('click', function(event, d) {
+            showPanel(d.id);
+        });
+
+        // Update positions
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        function showPanel(componentId) {
+            const info = componentInfo[componentId];
+            if (!info) return;
+
+            const panelContent = document.getElementById('panelContent');
+            panelContent.innerHTML = `
+                <h3>${info.name}</h3>
+                <p><strong>Repository:</strong> ${info.repo}</p>
+                <p><strong>Language:</strong> ${info.language}</p>
+                <p><strong>Description:</strong></p>
+                <p>${info.description}</p>
+                ${info.dependencies.length > 0 ? `
+                    <p><strong>Dependencies:</strong></p>
+                    <ul style="margin-left: 15px; color: #666;">
+                        ${info.dependencies.map(dep => `<li>${dep}</li>`).join('')}
+                    </ul>
+                ` : ''}
+                <p style="margin-top: 15px; font-size: 0.85em; color: #999;">
+                    <a href="https://github.com/EquityZen/${info.repo}" target="_blank" style="color: #667eea;">
+                        View on GitHub →
+                    </a>
+                </p>
+            `;
+            document.getElementById('infoPanel').classList.add('show');
+        }
+
+        function closePanel() {
+            document.getElementById('infoPanel').classList.remove('show');
+        }
+
+        function resetZoom() {
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(0, 0)
+            );
+        }
+
+        function zoomIn() {
+            svg.transition().duration(750).call(zoom.scaleBy, 1.3);
+        }
+
+        function zoomOut() {
+            svg.transition().duration(750).call(zoom.scaleBy, 0.7);
+        }
+
+        // Close panel when clicking outside
+        document.addEventListener('click', function(event) {
+            const panel = document.getElementById('infoPanel');
+            if (!panel.contains(event.target) && !event.target.closest('.node')) {
+                closePanel();
+            }
+        });
+    </script>
+</body>
+</html>
